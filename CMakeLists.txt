@@ -22,6 +22,8 @@ ELSE()
   SET(PTHREADPOOL_BUILD_BENCHMARKS OFF CACHE BOOL "Build pthreadpool micro-benchmarks")
 ENDIF()
 
+OPTION(PTHREADPOOL_USE_SYSTEM_LIBS "Use system-provided dependency libraries" OFF)
+
 # ---[ CMake options
 INCLUDE(GNUInstallDirs)
 
@@ -40,6 +42,7 @@ MACRO(PTHREADPOOL_TARGET_ENABLE_CXX11 target)
 ENDMACRO()
 
 # ---[ Download deps
+IF(NOT PTHREADPOOL_USE_SYSTEM_LIBS)
 IF(NOT DEFINED FXDIV_SOURCE_DIR)
   MESSAGE(STATUS "Downloading FXdiv to ${CMAKE_BINARY_DIR}/FXdiv-source (define FXDIV_SOURCE_DIR to avoid it)")
   CONFIGURE_FILE(cmake/DownloadFXdiv.cmake "${CMAKE_BINARY_DIR}/FXdiv-download/CMakeLists.txt")
@@ -68,6 +71,7 @@ IF(PTHREADPOOL_BUILD_BENCHMARKS AND NOT DEFINED GOOGLEBENCHMARK_SOURCE_DIR)
   EXECUTE_PROCESS(COMMAND "${CMAKE_COMMAND}" --build .
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/googlebenchmark-download")
   SET(GOOGLEBENCHMARK_SOURCE_DIR "${CMAKE_BINARY_DIR}/googlebenchmark-source" CACHE STRING "Google Benchmark source directory")
+ENDIF()
 ENDIF()
 
 # ---[ pthreadpool library
@@ -135,6 +139,9 @@ ENDIF()
 SET_TARGET_PROPERTIES(pthreadpool PROPERTIES
   C_STANDARD 11
   C_EXTENSIONS NO)
+# YY.M.D of last upstream commit to main
+set(pthreadpool_VERSION 23.8.29)
+SET_TARGET_PROPERTIES(pthreadpool PROPERTIES VERSION ${pthreadpool_VERSION} SOVERSION ${pthreadpool_VERSION})
 TARGET_LINK_LIBRARIES(pthreadpool PUBLIC pthreadpool_interface)
 TARGET_INCLUDE_DIRECTORIES(pthreadpool PRIVATE src)
 IF(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
@@ -154,14 +161,16 @@ IF(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 ENDIF()
 
 # ---[ Configure FXdiv
-IF(NOT TARGET fxdiv)
+IF(NOT TARGET fxdiv AND NOT PTHREADPOOL_USE_SYSTEM_LIBS)
   SET(FXDIV_BUILD_TESTS OFF CACHE BOOL "")
   SET(FXDIV_BUILD_BENCHMARKS OFF CACHE BOOL "")
   ADD_SUBDIRECTORY(
     "${FXDIV_SOURCE_DIR}"
     "${CMAKE_BINARY_DIR}/FXdiv")
 ENDIF()
+IF(NOT PTHREADPOOL_USE_SYSTEM_LIBS)
 TARGET_LINK_LIBRARIES(pthreadpool PRIVATE fxdiv)
+ENDIF()
 
 INSTALL(TARGETS pthreadpool
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -169,7 +178,7 @@ INSTALL(TARGETS pthreadpool
 
 IF(PTHREADPOOL_BUILD_TESTS)
   # ---[ Build google test
-  IF(NOT TARGET gtest)
+  IF(NOT TARGET gtest AND NOT PTHREADPOOL_USE_SYSTEM_LIBS)
     SET(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
     ADD_SUBDIRECTORY(
       "${GOOGLETEST_SOURCE_DIR}"
@@ -178,14 +187,14 @@ IF(PTHREADPOOL_BUILD_TESTS)
 
   ADD_EXECUTABLE(pthreadpool-test test/pthreadpool.cc)
   SET_TARGET_PROPERTIES(pthreadpool-test PROPERTIES
-    CXX_STANDARD 11
+    CXX_STANDARD 14
     CXX_EXTENSIONS NO)
   TARGET_LINK_LIBRARIES(pthreadpool-test pthreadpool gtest gtest_main)
   ADD_TEST(pthreadpool pthreadpool-test)
 
   ADD_EXECUTABLE(pthreadpool-cxx-test test/pthreadpool-cxx.cc)
   SET_TARGET_PROPERTIES(pthreadpool-cxx-test PROPERTIES
-    CXX_STANDARD 11
+    CXX_STANDARD 14
     CXX_EXTENSIONS NO)
   TARGET_LINK_LIBRARIES(pthreadpool-cxx-test pthreadpool gtest gtest_main)
   ADD_TEST(pthreadpool-cxx pthreadpool-cxx-test)
@@ -193,7 +202,7 @@ ENDIF()
 
 IF(PTHREADPOOL_BUILD_BENCHMARKS)
   # ---[ Build google benchmark
-  IF(NOT TARGET benchmark)
+  IF(NOT TARGET benchmark AND NOT PTHREADPOOL_USE_SYSTEM_LIBS)
     SET(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "")
     ADD_SUBDIRECTORY(
       "${GOOGLEBENCHMARK_SOURCE_DIR}"
@@ -202,13 +211,13 @@ IF(PTHREADPOOL_BUILD_BENCHMARKS)
 
   ADD_EXECUTABLE(latency-bench bench/latency.cc)
   SET_TARGET_PROPERTIES(latency-bench PROPERTIES
-    CXX_STANDARD 11
+    CXX_STANDARD 14
     CXX_EXTENSIONS NO)
   TARGET_LINK_LIBRARIES(latency-bench pthreadpool benchmark)
 
   ADD_EXECUTABLE(throughput-bench bench/throughput.cc)
   SET_TARGET_PROPERTIES(throughput-bench PROPERTIES
-    CXX_STANDARD 11
+    CXX_STANDARD 14
     CXX_EXTENSIONS NO)
   TARGET_LINK_LIBRARIES(throughput-bench pthreadpool benchmark)
 ENDIF()
